@@ -1,0 +1,14 @@
+numpy
+pydub
+openai-whisper
+torchaudio
+transformers
+faiss-cpu
+PySimpleGUI
+soundfile
+sounddevice
+librosa
+requests
+resemblyzer
+torch
+git+https://github.com/m-bain/whisperx.git
