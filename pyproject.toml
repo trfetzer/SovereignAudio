@@ -1,0 +1,22 @@
+[project]
+name = "sovereign-audio"
+version = "0.1.0"
+description = "Local-first voice memo workstation with transcription and semantic search."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "soundfile",
+    "pydub",
+    "numpy",
+    "librosa",
+    "torch",
+    "whisperx",
+    "resemblyzer",
+    "requests",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+]
+
+[tool.uv]
+package = false

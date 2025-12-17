@@ -46,7 +46,10 @@ def import_external_recordings(import_folder="recordings/imported"):
         audio.export(wav_path, format="wav")
 
         print(f"Transcribing with diarization: {wav_path}")
-        transcript_path = transcribe_with_diarization(wav_path, prompt_name_mapping=True)
+        transcript_path = transcribe_with_diarization(
+            wav_path,
+            prompt_name_mapping=False,
+        )
 
         if transcript_path:
             # Move transcript to same subfolder
@@ -54,6 +57,10 @@ def import_external_recordings(import_folder="recordings/imported"):
             os.makedirs(transcript_target_folder, exist_ok=True)
             transcript_target = os.path.join(transcript_target_folder, os.path.basename(transcript_path))
             shutil.move(transcript_path, transcript_target)
+            structured_src = os.path.splitext(transcript_path)[0] + ".json"
+            if os.path.exists(structured_src):
+                structured_tgt = os.path.splitext(transcript_target)[0] + ".json"
+                shutil.move(structured_src, structured_tgt)
 
             print(f"Embedding transcript: {transcript_target}")
             embedding_path = embed_text_file(transcript_target)

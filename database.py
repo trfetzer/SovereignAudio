@@ -37,8 +37,10 @@ def update_transcript(audio_path, transcript_path):
         "UPDATE sessions SET transcript_path=?, diarized=1 WHERE audio_path=?",
         (transcript_path, audio_path)
     )
+    updated = c.rowcount
     conn.commit()
     conn.close()
+    return updated
 
 def update_embedding(transcript_path, embedding_path):
     conn = sqlite3.connect(DB_PATH)
@@ -47,5 +49,32 @@ def update_embedding(transcript_path, embedding_path):
         "UPDATE sessions SET embedding_path=?, embedded=1 WHERE transcript_path=?",
         (embedding_path, transcript_path)
     )
+    updated = c.rowcount
     conn.commit()
     conn.close()
+    return updated
+
+def update_session_title(transcript_path, new_title):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE sessions SET title=? WHERE transcript_path=?",
+        (new_title, transcript_path)
+    )
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return updated
+
+def get_session_by_transcript(transcript_path):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, title, timestamp FROM sessions WHERE transcript_path=?",
+        (transcript_path,)
+    )
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"id": row[0], "title": row[1], "timestamp": row[2]}
+    return None

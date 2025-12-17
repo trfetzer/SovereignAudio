@@ -1,0 +1,7 @@
+{
+  "asr_model": null,
+  "language": "en",
+  "embed_model_doc": "mxbai-embed-large:latest",
+  "embed_model_query": "mxbai-embed-large:latest",
+  "summary_model": "gpt-oss:20b"
+}
