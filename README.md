@@ -1,5 +1,4 @@
-# SovereignAudio (shareable copy)
-
+# SovereignAudio
 This folder is a clean copy of the app with no audio, transcripts, or embeddings. All data stays local when you run it.
 
 ## Prerequisites
