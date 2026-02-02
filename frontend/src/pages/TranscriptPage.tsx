@@ -1,20 +1,20 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTranscript, updateSpeakers, generateSummary, renameSession } from "../api";
+import { calendarSuggestions, getTranscript, linkCalendarEvent, suggestTitle, updateSpeakers, generateSummary, renameSession } from "../api";
 import { useAudio } from "../hooks/useAudio";
 
 type Segment = { speaker: string; text: string; start?: number; end?: number };
 
 export default function TranscriptPage() {
   const { sessionId } = useParams();
-  const decoded = sessionId ? decodeURIComponent(sessionId) : "";
+  const id = sessionId ? decodeURIComponent(sessionId) : "";
   const qc = useQueryClient();
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ["transcript", decoded],
-    queryFn: () => getTranscript(decoded),
-    enabled: !!decoded
+    queryKey: ["transcript", id],
+    queryFn: () => getTranscript(id),
+    enabled: !!id
   });
   
   const [speed, setSpeed] = useState(1);
@@ -26,22 +26,24 @@ export default function TranscriptPage() {
   
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState("");
+  const [titleCandidates, setTitleCandidates] = useState<string[] | null>(null);
+  const [calendarCandidates, setCalendarCandidates] = useState<any[] | null>(null);
 
   useEffect(() => {
     if (data?.title) setTitle(data.title);
   }, [data?.title]);
 
   const renameMutation = useMutation({
-    mutationFn: (updates: Record<string, string>) => updateSpeakers(decoded, updates),
+    mutationFn: (updates: Record<string, string>) => updateSpeakers(id, updates),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["transcript", decoded] });
+      qc.invalidateQueries({ queryKey: ["transcript", id] });
       setEditingSpeaker(null);
     },
     onError: (err: any) => alert("Failed to rename speaker: " + err.message)
   });
 
   const summaryMutation = useMutation({
-    mutationFn: () => generateSummary(decoded),
+    mutationFn: () => generateSummary(id),
     onSuccess: (data) => {
       setSummaryText(data.summary);
       setShowSummary(true);
@@ -50,12 +52,33 @@ export default function TranscriptPage() {
   });
 
   const titleMutation = useMutation({
-    mutationFn: (newTitle: string) => renameSession(decoded, newTitle),
+    mutationFn: (newTitle: string) => renameSession(id, newTitle),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["transcript", decoded] });
+      qc.invalidateQueries({ queryKey: ["transcript", id] });
       setIsEditingTitle(false);
     },
     onError: (err: any) => alert("Failed to rename session: " + err.message)
+  });
+
+  const suggestTitleMutation = useMutation({
+    mutationFn: () => suggestTitle(id),
+    onSuccess: (res) => setTitleCandidates(res.titles || []),
+    onError: (err: any) => alert("Title suggestion failed: " + err.message),
+  });
+
+  const calendarMutation = useMutation({
+    mutationFn: () => calendarSuggestions(id, 5),
+    onSuccess: (res) => setCalendarCandidates(res.suggestions || []),
+    onError: (err: any) => alert("Calendar fetch failed: " + err.message),
+  });
+
+  const calendarLinkMutation = useMutation({
+    mutationFn: (event: any) => linkCalendarEvent(id, event, true),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transcript", id] });
+      setCalendarCandidates(null);
+    },
+    onError: (err: any) => alert("Linking event failed: " + err.message),
   });
 
   const handleRename = (oldName: string) => {
@@ -124,7 +147,7 @@ export default function TranscriptPage() {
   }, [data]);
 
   const audioSrc = (start?: number, end?: number) =>
-    `/audio?transcript_path=${encodeURIComponent(decoded)}&start=${start || 0}&end=${end || 0}`;
+    `/sessions/${encodeURIComponent(id)}/audio?start=${start || 0}&end=${end || 0}`;
 
   if (isLoading) return <p>Loading transcript…</p>;
   if (error) return <p>Error loading transcript.</p>;
@@ -161,6 +184,13 @@ export default function TranscriptPage() {
           )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            className="btn secondary"
+            onClick={() => suggestTitleMutation.mutate()}
+            disabled={suggestTitleMutation.isPending}
+          >
+            {suggestTitleMutation.isPending ? "Suggesting..." : "Suggest Title"}
+          </button>
           <button className="btn secondary" onClick={() => downloadTranscript("txt")}>Download TXT</button>
           <button className="btn secondary" onClick={() => downloadTranscript("json")}>Download JSON</button>
           <button 
@@ -174,6 +204,77 @@ export default function TranscriptPage() {
             {summaryMutation.isPending ? "Generating Summary..." : (summaryText ? (showSummary ? "Hide Summary" : "Show Summary") : "Generate Summary")}
           </button>
         </div>
+      </div>
+
+      {titleCandidates && titleCandidates.length > 0 && (
+        <div className="card" style={{ background: "#11151c", marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Suggested titles</h3>
+          <div style={{ display: "grid", gap: 8 }}>
+            {titleCandidates.map((t) => (
+              <div key={t} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div style={{ flex: 1 }}>{t}</div>
+                <button className="btn secondary" onClick={() => titleMutation.mutate(t)}>
+                  Apply
+                </button>
+              </div>
+            ))}
+          </div>
+          <button className="btn secondary" style={{ marginTop: 10 }} onClick={() => setTitleCandidates(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <div className="card" style={{ background: "#11151c", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ marginTop: 0, marginBottom: 0 }}>Calendar</h3>
+          <button className="btn secondary" onClick={() => calendarMutation.mutate()} disabled={calendarMutation.isPending}>
+            {calendarMutation.isPending ? "Loading..." : "Suggest Event"}
+          </button>
+        </div>
+        {data.calendar ? (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontWeight: 600 }}>{data.calendar.summary || "(no title)"}</div>
+            <div style={{ opacity: 0.7, fontSize: 13 }}>{data.calendar.start} → {data.calendar.end}</div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 8, opacity: 0.7 }}>No event linked.</div>
+        )}
+        {Array.isArray(data.participants) && data.participants.length > 0 && (
+          <div style={{ marginTop: 10, opacity: 0.9, fontSize: 13 }}>
+            Participants: {data.participants.map((p: any) => p.name || p.email || String(p)).join(", ")}
+          </div>
+        )}
+        {calendarCandidates && (
+          <div style={{ marginTop: 12 }}>
+            <h4 style={{ margin: "8px 0" }}>Suggestions</h4>
+            {calendarCandidates.length === 0 ? (
+              <div style={{ opacity: 0.7 }}>No nearby events found.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {calendarCandidates.map((ev: any) => (
+                  <div key={ev.uid} className="card" style={{ background: "#0f131b", borderColor: "#1d2431" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>{ev.summary}</div>
+                        <div style={{ opacity: 0.7, fontSize: 12 }}>{ev.start} → {ev.end}</div>
+                        {typeof ev.score === "number" && (
+                          <div style={{ opacity: 0.6, fontSize: 12 }}>score {ev.score.toFixed(3)}</div>
+                        )}
+                      </div>
+                      <button className="btn secondary" onClick={() => calendarLinkMutation.mutate(ev)} disabled={calendarLinkMutation.isPending}>
+                        Attach
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="btn secondary" style={{ marginTop: 10 }} onClick={() => setCalendarCandidates(null)}>
+              Close
+            </button>
+          </div>
+        )}
       </div>
 
       {showSummary && summaryText && (

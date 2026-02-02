@@ -54,7 +54,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {recent.map((s: any) => (
-                <tr key={s.id || s.audio_path}>
+                <tr key={s.session_id}>
                   <td>{s.title || "Untitled"}</td>
                   <td>{s.timestamp?.split("T")[0]}</td>
                   <td>{s.transcript_path ? "✅" : "—"}</td>

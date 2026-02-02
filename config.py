@@ -1,11 +1,23 @@
 import os
 
 # --- Config ---
-DB_PATH = "file_index.db"
-TRANSCRIPT_FOLDER = "transcriptions"
-RECORDINGS_FOLDER = "recordings"
-EMBEDDINGS_FOLDER = "embeddings"
-VOICEPRINTS_FILE = "voiceprints.json"
+LIBRARY_ROOT = os.environ.get("SOV_AUDIO_LIBRARY_ROOT") or os.path.abspath("library")
+LIBRARY_INBOX_DIRNAME = "Inbox"
+LIBRARY_FOLDERS_DIRNAME = "Folders"
+LIBRARY_TRASH_DIRNAME = "Trash"
+
+LIBRARY_INBOX = os.path.join(LIBRARY_ROOT, LIBRARY_INBOX_DIRNAME)
+LIBRARY_FOLDERS = os.path.join(LIBRARY_ROOT, LIBRARY_FOLDERS_DIRNAME)
+LIBRARY_TRASH = os.path.join(LIBRARY_ROOT, LIBRARY_TRASH_DIRNAME)
+
+DB_PATH = os.environ.get("SOV_AUDIO_DB_PATH") or os.path.join(LIBRARY_ROOT, "file_index.db")
+
+# Legacy folders (kept for compatibility with older scripts/pipelines).
+TRANSCRIPT_FOLDER = os.environ.get("SOV_AUDIO_TRANSCRIPT_FOLDER") or os.path.join(LIBRARY_ROOT, "transcriptions")
+RECORDINGS_FOLDER = os.environ.get("SOV_AUDIO_RECORDINGS_FOLDER") or os.path.join(LIBRARY_ROOT, "recordings")
+EMBEDDINGS_FOLDER = os.environ.get("SOV_AUDIO_EMBEDDINGS_FOLDER") or os.path.join(LIBRARY_ROOT, "embeddings")
+
+VOICEPRINTS_FILE = os.environ.get("SOV_AUDIO_VOICEPRINTS_FILE") or os.path.join(LIBRARY_ROOT, "voiceprints.json")
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_EMBED_MODEL = "mxbai-embed-large:latest"
 
@@ -29,7 +41,7 @@ SUMMARY_MODEL_FAST = "llama3:latest"
 SUMMARY_MODEL_DEEP = "llama3:latest"
 
 # Vector index storage (per-chunk embeddings live here).
-VECTOR_DB_PATH = "vector_index.db"
+VECTOR_DB_PATH = os.environ.get("SOV_AUDIO_VECTOR_DB_PATH") or os.path.join(LIBRARY_ROOT, "vector_index.db")
 
 # Chunking heuristics for transcripts before embedding.
 CHUNK_MAX_WORDS = 220

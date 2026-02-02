@@ -1,0 +1,20 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+.venv/
+
+# Runtime library (default)
+library/
+
+# Legacy runtime folders (kept for backward compatibility)
+recordings/
+transcriptions/
+embeddings/
+voiceprints.json
+
+*.db
+
+# Frontend dev deps
+frontend/node_modules/
+frontend/.vite/

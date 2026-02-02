@@ -75,6 +75,41 @@ export default function SettingsPage() {
             <span className="hint">Creates a summary alongside each transcript.</span>
           </span>
         </label>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={Boolean(current?.auto_title_suggest)}
+            onChange={(e) => update("auto_title_suggest", e.target.checked)}
+          />
+          <span className="toggle-label">
+            Auto-suggest titles
+            <span className="hint">Generates title candidates after transcription.</span>
+          </span>
+        </label>
+      </div>
+
+      <div className="card" style={{ marginTop: 16, background: "#11151c" }}>
+        <h3 style={{ marginTop: 0 }}>Calendar (ICS feed)</h3>
+        <div className="row">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <label>ICS URL</label>
+            <input
+              className="input"
+              value={current?.calendar_ics_url || ""}
+              onChange={(e) => update("calendar_ics_url", e.target.value)}
+              placeholder="https://calendar.google.com/calendar/ical/.../public/basic.ics"
+            />
+          </div>
+          <div style={{ width: 220 }}>
+            <label>Match window (minutes)</label>
+            <input
+              className="input"
+              type="number"
+              value={current?.calendar_match_window_minutes ?? 45}
+              onChange={(e) => update("calendar_match_window_minutes", parseInt(e.target.value || "45", 10))}
+            />
+          </div>
+        </div>
       </div>
 
       <button className="btn" style={{ marginTop: 18 }} onClick={() => mutation.mutate(current || {})}>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { embedTranscript, getSettings, transcribeAudio, uploadFile } from "../api";
+import { embedSession, getSettings, transcribeSession, uploadFile } from "../api";
 
 type StepState = "idle" | "working" | "done" | "error";
 
@@ -19,6 +19,7 @@ export default function UploadPage() {
     transcribe: "idle",
     embed: "idle",
   });
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [transcriptPath, setTranscriptPath] = useState<string | null>(null);
   const [embeddingPath, setEmbeddingPath] = useState<string | null>(null);
 
@@ -41,6 +42,7 @@ export default function UploadPage() {
 
   const reset = () => {
     setSteps({ upload: "idle", transcribe: "idle", embed: "idle" });
+    setSessionId(null);
     setTranscriptPath(null);
     setEmbeddingPath(null);
     setLog([]);
@@ -95,9 +97,9 @@ export default function UploadPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const ensureEmbed = async (transcript: string, maybeExisting?: string | null) => {
+  const ensureEmbed = async (sid: string, maybeExisting?: string | null) => {
     if (maybeExisting) return maybeExisting;
-    const res = await embedTranscript(transcript);
+    const res = await embedSession(sid);
     return res.embedding_path;
   };
 
@@ -108,18 +110,19 @@ export default function UploadPage() {
       setSteps((s) => ({ ...s, upload: "working" }));
       pushLog("Uploading file…");
       const up = await uploadFile(file);
+      setSessionId(up.session_id);
       setSteps((s) => ({ ...s, upload: "done" }));
-      pushLog(`Uploaded: ${up.audio_path}`);
+      pushLog(`Uploaded session: ${up.session_id}`);
 
       setSteps((s) => ({ ...s, transcribe: "working" }));
       pushLog("Transcribing with diarization…");
-      const t = await transcribeAudio(up.audio_path, language);
+      const t = await transcribeSession(up.session_id, language);
       setTranscriptPath(t.transcript_path);
       setSteps((s) => ({ ...s, transcribe: "done" }));
       pushLog(`Transcript: ${t.transcript_path}`);
 
       setSteps((s) => ({ ...s, embed: "working" }));
-      const embPath = await ensureEmbed(t.transcript_path, t.embedding_path || null);
+      const embPath = await ensureEmbed(up.session_id, t.embedding_path || null);
       setEmbeddingPath(embPath || null);
       setSteps((s) => ({ ...s, embed: "done" }));
       pushLog(embPath ? `Embedding complete: ${embPath}` : "Embedding skipped.");
@@ -218,9 +221,9 @@ export default function UploadPage() {
           </div>
         )}
 
-        {transcriptPath && (
+        {sessionId && (
           <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <a className="btn secondary" href={`/sessions/${encodeURIComponent(transcriptPath)}`}>
+            <a className="btn secondary" href={`/sessions/${encodeURIComponent(sessionId)}`}>
               Open Transcript
             </a>
             {embeddingPath && (

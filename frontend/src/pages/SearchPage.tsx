@@ -57,19 +57,19 @@ export default function SearchPage() {
           {results.map((r, idx) => {
             const start = r.start || 0;
             const end = r.end || 0;
-            const url = r.transcript_path ? `/audio?transcript_path=${encodeURIComponent(r.transcript_path)}&start=${start}&end=${end}` : "";
+            const url = r.session_id ? `/sessions/${encodeURIComponent(r.session_id)}/audio?start=${start}&end=${end}` : "";
             return (
               <div key={idx} style={{ padding: "8px 0", borderBottom: "1px solid #1f2530" }}>
                 <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                  {r.kind} • sim {r.similarity?.toFixed ? r.similarity.toFixed(3) : r.similarity} • {r.session_path}
+                  {r.kind} • sim {r.similarity?.toFixed ? r.similarity.toFixed(3) : r.similarity} • {r.title || r.session_id}
                 </div>
                 <div style={{ margin: "6px 0" }}>{r.snippet || r.text}</div>
                 <div className="row">
                   <button className="btn secondary" disabled={!url} onClick={() => play(url, rate)}>
                     Play segment
                   </button>
-                  {r.transcript_path && (
-                    <a className="btn secondary" href={`/sessions/${encodeURIComponent(r.transcript_path)}`}>
+                  {r.session_id && (
+                    <a className="btn secondary" href={`/sessions/${encodeURIComponent(r.session_id)}`}>
                       Open transcript
                     </a>
                   )}

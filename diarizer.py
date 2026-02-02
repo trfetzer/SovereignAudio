@@ -79,6 +79,7 @@ def transcribe_with_diarization(
     asr_model=None,
     initial_prompt=None,
     pipeline=None,
+    output_dir=None,
 ):
     ensure_nltk_tokenizers()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -165,8 +166,10 @@ def transcribe_with_diarization(
     save_voiceprints(vps)
 
     base_name = os.path.splitext(os.path.basename(audio_path))[0] + "_diarized"
-    out_path = os.path.join(TRANSCRIPT_FOLDER, base_name + ".txt")
-    json_path = os.path.join(TRANSCRIPT_FOLDER, base_name + ".json")
+    out_dir = output_dir or TRANSCRIPT_FOLDER
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, base_name + ".txt")
+    json_path = os.path.join(out_dir, base_name + ".json")
 
     # Write plain text transcript for compatibility.
     with open(out_path, 'w', encoding='utf-8') as f:

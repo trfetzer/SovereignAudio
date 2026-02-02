@@ -21,11 +21,26 @@ export const getSettings = () => request("/settings");
 export const saveSettings = (payload: Record<string, unknown>) => request("/settings", { method: "POST", body: JSON.stringify(payload) });
 export const getVocab = () => request<{ words: string[] }>("/vocab");
 export const saveVocab = (words: string[]) => request("/vocab", { method: "POST", body: JSON.stringify({ words }) });
-export const listSessions = () => request<any[]>("/sessions");
-export const getTranscript = (sessionPath: string) =>
-  request<{ transcript_path: string; text: string; structured?: string; title?: string }>(`/transcripts/${encodeURIComponent(sessionPath)}`);
-export const renameSession = (sessionPath: string, title: string) =>
-  request(`/sessions/${encodeURIComponent(sessionPath)}/rename`, { method: "POST", body: JSON.stringify({ title }) });
+export const listFolders = () => request<any[]>("/folders");
+export const createFolder = (payload: { name: string; dir_name?: string; parent_id?: number | null }) =>
+  request("/folders", { method: "POST", body: JSON.stringify(payload) });
+export const renameFolder = (folderId: number, payload: { name: string; dir_name?: string }) =>
+  request(`/folders/${folderId}/rename`, { method: "POST", body: JSON.stringify(payload) });
+export const deleteFolder = (folderId: number) => request(`/folders/${folderId}`, { method: "DELETE" });
+
+export const listSessions = (folderId?: number | null) => {
+  const qs = folderId ? `?folder_id=${encodeURIComponent(String(folderId))}` : "";
+  return request<any[]>(`/sessions${qs}`);
+};
+export const getSession = (sessionId: string) => request<any>(`/sessions/${encodeURIComponent(sessionId)}`);
+export const getTranscript = (sessionId: string) =>
+  request<{ session_id: string; text: string; structured?: string; title?: string; participants?: any[]; calendar?: any; assets?: any }>(
+    `/sessions/${encodeURIComponent(sessionId)}/transcript`
+  );
+export const renameSession = (sessionId: string, title: string) =>
+  request(`/sessions/${encodeURIComponent(sessionId)}/rename`, { method: "POST", body: JSON.stringify({ title }) });
+export const moveSession = (sessionId: string, folderId: number) =>
+  request(`/sessions/${encodeURIComponent(sessionId)}/move`, { method: "POST", body: JSON.stringify({ folder_id: folderId }) });
 export const search = (payload: { prompt: string; threshold?: number }) =>
   request<{ results: any[] }>("/search", { method: "POST", body: JSON.stringify(payload) });
 export const uploadFile = async (file: File) => {
@@ -33,16 +48,26 @@ export const uploadFile = async (file: File) => {
   fd.append("file", file);
   const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: fd });
   if (!res.ok) throw new Error(await res.text());
-  return (await res.json()) as { audio_path: string };
+  return (await res.json()) as { session_id: string };
 };
-export const transcribeAudio = (audio_path: string, language?: string) =>
-  request<{ transcript_path: string; embedding_path?: string; summary_path?: string }>("/transcribe", {
+export const transcribeSession = (sessionId: string, language?: string) =>
+  request<{ session_id: string; transcript_path: string; embedding_path?: string; summary_path?: string }>(`/sessions/${encodeURIComponent(sessionId)}/transcribe`, {
     method: "POST",
-    body: JSON.stringify({ audio_path, language }),
+    body: JSON.stringify({ language }),
   });
-export const embedTranscript = (transcript_path: string) =>
-  request<{ embedding_path: string }>("/embed", { method: "POST", body: JSON.stringify({ transcript_path }) });
-export const updateSpeakers = (sessionPath: string, updates: Record<string, string>) =>
-  request(`/transcripts/${encodeURIComponent(sessionPath)}/speakers`, { method: "POST", body: JSON.stringify({ updates }) });
-export const generateSummary = (sessionPath: string, force = false) =>
-  request<{ summary: string }>("/summarize", { method: "POST", body: JSON.stringify({ session_path: sessionPath, force }) });
+export const embedSession = (sessionId: string) =>
+  request<{ embedding_path: string }>(`/sessions/${encodeURIComponent(sessionId)}/embed`, { method: "POST" });
+export const updateSpeakers = (sessionId: string, updates: Record<string, string>) =>
+  request(`/sessions/${encodeURIComponent(sessionId)}/speakers`, { method: "POST", body: JSON.stringify({ updates }) });
+export const generateSummary = (sessionId: string, force = false) =>
+  request<{ summary: string }>(`/sessions/${encodeURIComponent(sessionId)}/summarize`, { method: "POST", body: JSON.stringify({ force }) });
+
+export const listFolderSuggestions = () => request<any[]>("/folder_suggestions");
+export const reconcileLibrary = () => request<any>("/library/reconcile", { method: "POST" });
+
+export const calendarSuggestions = (sessionId: string, limit = 5) =>
+  request<{ session_id: string; suggestions: any[] }>(`/calendar/suggestions?session_id=${encodeURIComponent(sessionId)}&limit=${encodeURIComponent(String(limit))}`);
+export const linkCalendarEvent = (sessionId: string, event: any, applyParticipants = true) =>
+  request(`/sessions/${encodeURIComponent(sessionId)}/calendar_link`, { method: "POST", body: JSON.stringify({ event, apply_participants: applyParticipants }) });
+export const suggestTitle = (sessionId: string) =>
+  request<{ titles: string[] }>(`/sessions/${encodeURIComponent(sessionId)}/suggest_title`, { method: "POST" });

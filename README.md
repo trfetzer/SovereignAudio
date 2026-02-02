@@ -50,18 +50,19 @@ This folder is a clean copy of the app with no audio, transcripts, or embeddings
 - All audio/transcripts/embeddings stay in the working folder unless you expose the server.
 
 ## Data hygiene
-- Runtime data is stored locally in:
-  - `recordings/`, `transcriptions/`, `embeddings/`
-  - `file_index.db`, `vector_index.db`, `voiceprints.json`
-- Delete when done to keep this share clean:  
-  - macOS/Linux: `rm -rf recordings transcriptions embeddings file_index.db vector_index.db voiceprints.json`  
-  - Windows (PowerShell):  
-    ```
-    rmdir /s /q recordings transcriptions embeddings
-    del file_index.db vector_index.db voiceprints.json
-    ```
-- These folders/files are recreated automatically on next run.
+- By default, runtime data is stored under `library/`:
+  - `library/Inbox/…` — new sessions land here.
+  - `library/Folders/<folder>/…` — sessions you drag/drop into folders.
+  - `library/Trash/…` — deleted sessions/folders (non-destructive).
+  - `library/file_index.db`, `library/vector_index.db` — indexes (rebuildable).
+  - `library/voiceprints.json`, `library/settings.json`, `library/vocab.json`.
+- You can override the location with `SOV_AUDIO_LIBRARY_ROOT=/path/to/Library`.
+- To delete all local data:
+  - macOS/Linux: `rm -rf library`
+  - Windows (PowerShell): `rmdir /s /q library`
+- The folder is recreated automatically on next run.
 
 ## Notes
 - Configure embedding/summary behavior in `settings.json` or via the Settings page (auto-embed/auto-summarize).
+- Calendar integration uses a read-only ICS feed URL (Settings → Calendar).
 - If exposing the app beyond your machine, put it behind HTTPS and add auth. For local use, keep it on LAN or localhost.

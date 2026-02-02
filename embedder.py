@@ -51,7 +51,7 @@ def _prepare_chunks(text_file_path: str) -> Dict:
     return {"structured_path": structured_path, "structured": structured, "chunks": chunks, "text": full_text}
 
 
-def embed_text_file(text_file_path):
+def embed_text_file(text_file_path: str, *, session_key: Optional[str] = None, output_dir: Optional[str] = None):
     """Embed a transcript into chunks + aggregate embedding JSON.
 
     Returns path to the aggregate embedding JSON (legacy-compatible).
@@ -75,16 +75,18 @@ def embed_text_file(text_file_path):
                 embedded_chunks.append(ch_with_emb)
 
         # Persist chunk embeddings to the vector store for retrieval.
-        try:
-            session_rel = os.path.relpath(text_file_path, TRANSCRIPT_FOLDER)
-        except ValueError:
-            session_rel = text_file_path
-        upsert_chunk_embeddings(session_rel, embedded_chunks)
+        session_ref = session_key
+        if not session_ref:
+            try:
+                session_ref = os.path.relpath(text_file_path, TRANSCRIPT_FOLDER)
+            except ValueError:
+                session_ref = text_file_path
+        upsert_chunk_embeddings(session_ref, embedded_chunks)
         # Update FTS index with full text.
         upsert_doc(
-            session_rel,
+            session_ref,
             full_text,
-            date=session_rel.split(os.sep)[0] if os.sep in session_rel else "",
+            date=str(session_ref).split(os.sep)[0] if os.sep in str(session_ref) else "",
         )
 
         # Aggregate embedding (mean of chunks) for legacy consumers.
@@ -103,8 +105,9 @@ def embed_text_file(text_file_path):
             return None
 
         base = os.path.splitext(os.path.basename(text_file_path))[0]
-        out = os.path.join(EMBEDDINGS_FOLDER, base + ".json")
-        os.makedirs(EMBEDDINGS_FOLDER, exist_ok=True)
+        out_dir = output_dir or EMBEDDINGS_FOLDER
+        out = os.path.join(out_dir, base + "_embedding.json")
+        os.makedirs(out_dir, exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
             json.dump({"embedding": agg_embedding, "chunk_count": len(embedded_chunks)}, f)
         return out

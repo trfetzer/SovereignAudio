@@ -5,6 +5,7 @@ export default function LivePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState("Idle");
   const [transcript, setTranscript] = useState<string[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
@@ -26,11 +27,20 @@ export default function LivePage() {
       };
 
       ws.onmessage = (event) => {
-        // Handle incoming transcript updates
-        // The server sends the full transcript so far (or at least a large chunk)
-        // For now, we just replace the content.
-        const text = event.data;
-        setTranscript([text]);
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "session" && msg.session_id) {
+            setSessionId(msg.session_id);
+            return;
+          }
+          if (msg.type === "partial") {
+            setTranscript([msg.text || ""]);
+            return;
+          }
+        } catch {
+          // fallback: treat as plain text
+          setTranscript([String(event.data || "")]);
+        }
       };
 
       ws.onclose = () => {
@@ -84,6 +94,14 @@ export default function LivePage() {
         )}
         <div>Status: {status}</div>
       </div>
+
+      {sessionId && (
+        <div style={{ marginBottom: 12 }}>
+          <a className="btn secondary" href={`/sessions/${encodeURIComponent(sessionId)}`}>
+            Open session
+          </a>
+        </div>
+      )}
 
       <div className="card" style={{ background: "#171c24", minHeight: 300, maxHeight: "60vh", overflow: "auto" }}>
         {transcript.length === 0 ? (
