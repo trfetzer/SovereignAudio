@@ -41,6 +41,15 @@ def _load_from_disk():
         print(f"[warn] Failed to load settings: {exc}")
 
 
+def refresh():
+    """Reload settings from disk.
+
+    Some parts of the app update the settings file directly (via the API). To
+    keep consumers like the embedder consistent, refresh before reads.
+    """
+    _load_from_disk()
+
+
 def _save_to_disk():
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -56,6 +65,7 @@ def set_asr_model(name: str):
 
 
 def get_asr_model() -> str:
+    refresh()
     return _state.get("asr_model", ASR_MODEL)
 
 
@@ -66,6 +76,7 @@ def set_language(code: str):
 
 
 def get_language() -> str:
+    refresh()
     return _state.get("language", DEFAULT_LANGUAGE)
 
 
@@ -76,6 +87,7 @@ def set_embed_model_doc(name: str):
 
 
 def get_embed_model_doc() -> str:
+    refresh()
     return _state.get("embed_model_doc", EMBED_MODEL_DOC)
 
 
@@ -86,6 +98,7 @@ def set_embed_model_query(name: str):
 
 
 def get_embed_model_query() -> str:
+    refresh()
     return _state.get("embed_model_query", EMBED_MODEL_QUERY)
 
 
@@ -95,6 +108,7 @@ def set_input_device(device):
 
 
 def get_input_device():
+    refresh()
     return _state.get("input_device")
 
 
@@ -104,6 +118,7 @@ def set_silence_autostop(enabled: bool):
 
 
 def get_silence_autostop() -> bool:
+    refresh()
     return bool(_state.get("silence_autostop", False))
 
 
@@ -116,6 +131,7 @@ def set_silence_seconds(value: float):
 
 
 def get_silence_seconds() -> float:
+    refresh()
     return float(_state.get("silence_seconds", 0.0))
 
 
@@ -128,6 +144,7 @@ def set_silence_threshold(value: float):
 
 
 def get_silence_threshold() -> float:
+    refresh()
     return float(_state.get("silence_threshold", 0.0))
 
 
