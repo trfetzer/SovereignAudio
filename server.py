@@ -79,6 +79,18 @@ asr_device = None
 
 def ensure_dirs():
     ensure_library_dirs()
+    # Seed runtime settings/vocab from legacy repo-root files (first run migration).
+    project_root = Path(__file__).resolve().parent
+    if not os.path.exists(SETTINGS_FILE):
+        legacy = project_root / "settings.json"
+        if legacy.exists():
+            os.makedirs(os.path.dirname(SETTINGS_FILE) or ".", exist_ok=True)
+            shutil.copy2(str(legacy), SETTINGS_FILE)
+    if not os.path.exists(VOCAB_FILE):
+        legacy = project_root / "vocab.json"
+        if legacy.exists():
+            os.makedirs(os.path.dirname(VOCAB_FILE) or ".", exist_ok=True)
+            shutil.copy2(str(legacy), VOCAB_FILE)
     for folder in [TRANSCRIPT_FOLDER, EMBEDDINGS_FOLDER]:
         os.makedirs(folder, exist_ok=True)
     init_db()
@@ -112,6 +124,7 @@ def load_settings():
             "embed_model_doc": OLLAMA_EMBED_MODEL,
             "embed_model_query": OLLAMA_EMBED_MODEL,
             "summary_model": SUMMARY_MODEL_FAST,
+            "title_model": "",
             "auto_embed": True,
             "auto_summarize": False,
             "auto_title_suggest": False,
@@ -167,7 +180,7 @@ def generate_summary(text: str):
 
 def generate_title_candidates(text: str, *, calendar: Optional[dict] = None, participants: Optional[list] = None) -> List[str]:
     settings = load_settings()
-    model = settings.get("summary_model") or SUMMARY_MODEL_FAST
+    model = (settings.get("title_model") or "").strip() or settings.get("summary_model") or SUMMARY_MODEL_FAST
 
     participants = participants or []
     people = []
@@ -204,17 +217,33 @@ Return ONLY valid JSON in this exact shape:
 {{"titles":["...","...","..."]}}
 """.strip()
 
-    resp = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={"model": model, "prompt": prompt, "stream": False},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    raw = (resp.json().get("response") or "").strip()
+    try:
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=300,
+        )
+        resp.raise_for_status()
+        raw = (resp.json().get("response") or "").strip()
+    except requests.RequestException as exc:
+        detail = str(exc)
+        try:
+            if getattr(exc, "response", None) is not None:
+                detail = f"{detail}: {exc.response.text}"
+        except Exception:
+            pass
+        raise HTTPException(status_code=502, detail=f"Title suggestion failed (Ollama model '{model}'): {detail}")
 
     candidates: List[str] = []
     try:
-        parsed = json.loads(raw)
+        cleaned = raw
+        cleaned = re.sub(r"^```(?:json)?\\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\\s*```$", "", cleaned)
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            cleaned = cleaned[start : end + 1]
+        parsed = json.loads(cleaned)
         titles = parsed.get("titles") if isinstance(parsed, dict) else parsed
         if isinstance(titles, list):
             for t in titles:
@@ -237,6 +266,10 @@ Return ONLY valid JSON in this exact shape:
     out: List[str] = []
     for t in candidates:
         t = t.strip().strip('"').strip()
+        # Enforce "short title" constraint defensively.
+        words = t.split()
+        if len(words) > 8:
+            t = " ".join(words[:8])
         if not t:
             continue
         if t.lower() in seen:

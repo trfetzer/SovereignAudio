@@ -50,6 +50,15 @@ export default function SettingsPage() {
           <label>Summary Model (Ollama)</label>
           <input className="input" value={current?.summary_model || ""} onChange={(e) => update("summary_model", e.target.value)} placeholder="e.g. llama3:latest" />
         </div>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <label>Title Model (optional)</label>
+          <input
+            className="input"
+            value={current?.title_model || ""}
+            onChange={(e) => update("title_model", e.target.value)}
+            placeholder="defaults to Summary Model"
+          />
+        </div>
       </div>
 
       <div className="row" style={{ marginTop: 16, gap: 16 }}>

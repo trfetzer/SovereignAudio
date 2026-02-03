@@ -12,10 +12,11 @@ from config import (
     DEFAULT_LANGUAGE,
     EMBED_MODEL_DOC,
     EMBED_MODEL_QUERY,
+    LIBRARY_ROOT,
 )
 
 
-SETTINGS_FILE = "settings.json"
+SETTINGS_FILE = os.path.join(LIBRARY_ROOT, "settings.json")
 
 _state = {
     "asr_model": ASR_MODEL,
