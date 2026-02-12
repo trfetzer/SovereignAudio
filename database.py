@@ -11,6 +11,9 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+_UNSET = object()
+
+
 def _ensure_parent_dir(path: str) -> None:
     parent = os.path.dirname(path)
     if parent:
@@ -375,10 +378,10 @@ def update_session_folder(session_id: str, folder_id: int, session_dir: Optional
 def update_session_paths(
     session_id: str,
     *,
-    audio_path: Optional[str] = None,
-    transcript_path: Optional[str] = None,
-    embedding_path: Optional[str] = None,
-    summary_path: Optional[str] = None,
+    audio_path: Any = _UNSET,
+    transcript_path: Any = _UNSET,
+    embedding_path: Any = _UNSET,
+    summary_path: Any = _UNSET,
     diarized: Optional[bool] = None,
     embedded: Optional[bool] = None,
     missing_on_disk: Optional[bool] = None,
@@ -387,13 +390,14 @@ def update_session_paths(
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     updates: Dict[str, Any] = {"updated_at": _utc_now_iso()}
-    if audio_path is not None:
+    # NOTE: Use sentinel defaults so callers can explicitly clear paths by passing None.
+    if audio_path is not _UNSET:
         updates["audio_path"] = audio_path
-    if transcript_path is not None:
+    if transcript_path is not _UNSET:
         updates["transcript_path"] = transcript_path
-    if embedding_path is not None:
+    if embedding_path is not _UNSET:
         updates["embedding_path"] = embedding_path
-    if summary_path is not None:
+    if summary_path is not _UNSET:
         updates["summary_path"] = summary_path
     if diarized is not None:
         updates["diarized"] = int(bool(diarized))

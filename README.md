@@ -65,5 +65,6 @@ This folder is a clean copy of the app with no audio, transcripts, or embeddings
 ## Notes
 - Configure embedding/summary behavior in `settings.json` or via the Settings page (auto-embed/auto-summarize).
 - Speaker clustering happens per conversation; no persistent speaker profiles/voiceprints are written to disk.
+- For privacy, you can auto-delete or sanitize audio after transcription (Settings → Privacy). Deleting audio is the only reliable way to prevent reuse.
 - Calendar integration uses a read-only ICS feed URL (Settings → Calendar).
 - If exposing the app beyond your machine, put it behind HTTPS and add auth. For local use, keep it on LAN or localhost.

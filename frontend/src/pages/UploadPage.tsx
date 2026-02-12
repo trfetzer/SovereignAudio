@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { embedSession, getSettings, transcribeSession, uploadFile } from "../api";
+import { deleteSessionAudio, embedSession, getSettings, sanitizeSessionAudio, transcribeSession, uploadFile } from "../api";
 
 type StepState = "idle" | "working" | "done" | "error";
 
@@ -22,6 +22,7 @@ export default function UploadPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [transcriptPath, setTranscriptPath] = useState<string | null>(null);
   const [embeddingPath, setEmbeddingPath] = useState<string | null>(null);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -231,6 +232,53 @@ export default function UploadPage() {
                 Embedded
               </span>
             )}
+          </div>
+        )}
+
+        {sessionId && (
+          <div className="card" style={{ marginTop: 12, background: "#0f131b", borderColor: "#1d2431" }}>
+            <h4 style={{ marginTop: 0 }}>Privacy recommendation</h4>
+            <p style={{ color: "#94a3b8" }}>
+              Consider deleting the original audio after processing. Deleting is the only reliable way to prevent reuse; sanitizing reduces voice fidelity but is
+              not a formal guarantee against ML training/voice reconstruction.
+            </p>
+            <div className="row">
+              <button
+                className="btn danger"
+                disabled={privacyBusy}
+                onClick={async () => {
+                  if (!confirm("Delete the original audio file? This cannot be undone.")) return;
+                  try {
+                    setPrivacyBusy(true);
+                    await deleteSessionAudio(sessionId);
+                    alert("Audio deleted (if present).");
+                  } catch (err: any) {
+                    alert("Delete failed: " + (err.message || "Unknown error"));
+                  } finally {
+                    setPrivacyBusy(false);
+                  }
+                }}
+              >
+                Delete audio
+              </button>
+              <button
+                className="btn secondary"
+                disabled={privacyBusy}
+                onClick={async () => {
+                  try {
+                    setPrivacyBusy(true);
+                    await sanitizeSessionAudio(sessionId);
+                    alert("Audio sanitized.");
+                  } catch (err: any) {
+                    alert("Sanitize failed: " + (err.message || "Unknown error"));
+                  } finally {
+                    setPrivacyBusy(false);
+                  }
+                }}
+              >
+                Sanitize audio
+              </button>
+            </div>
           </div>
         )}
       </div>

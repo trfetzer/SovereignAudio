@@ -124,6 +124,13 @@ def load_settings():
             "embed_model_query": OLLAMA_EMBED_MODEL,
             "summary_model": SUMMARY_MODEL_FAST,
             "title_model": "",
+            # Audio privacy controls:
+            # - keep: keep original audio file
+            # - delete: delete original audio file after transcription pipeline
+            # - sanitize: replace audio with noisy, downsampled WAV after pipeline
+            "audio_postprocess_action": "keep",
+            "audio_sanitize_snr_db": 0.0,
+            "audio_sanitize_resample_hz": 8000,
             "auto_embed": True,
             "auto_summarize": False,
             "auto_title_suggest": False,
@@ -334,6 +341,121 @@ def maybe_suggest_title(session_id: str, session_dir: Path, transcript_path: Pat
     return candidates
 
 
+def _update_structured_transcript_audio_path(session_dir: Path, meta: dict, audio_path: Optional[Path]) -> None:
+    assets = meta.get("assets") or {}
+    struct_name = assets.get("transcript_json")
+    transcript_name = assets.get("transcript_txt")
+    struct_path = resolve_asset_path(session_dir, struct_name) if struct_name else None
+    if not struct_path and transcript_name:
+        struct_path = resolve_asset_path(session_dir, Path(transcript_name).with_suffix(".json").name)
+    if not struct_path or not struct_path.exists():
+        return
+    try:
+        data = json.loads(struct_path.read_text(encoding="utf-8"))
+        data["audio_path"] = str(audio_path.resolve()) if audio_path else None
+        struct_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        return
+
+
+def delete_session_audio(session_id: str, session_dir: Path) -> bool:
+    meta = load_meta(session_dir)
+    assets = meta.get("assets") or {}
+    audio_name = assets.get("audio")
+    audio_path = resolve_asset_path(session_dir, audio_name)
+    if not audio_path or not audio_path.exists():
+        assets["audio"] = None
+        meta["assets"] = assets
+        save_meta(session_dir, meta)
+        update_session_paths(session_id, audio_path=None)
+        _update_structured_transcript_audio_path(session_dir, meta, None)
+        return False
+
+    try:
+        audio_path.unlink()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to delete audio: {exc}")
+
+    assets["audio"] = None
+    meta["assets"] = assets
+    save_meta(session_dir, meta)
+    update_session_paths(session_id, audio_path=None)
+    _update_structured_transcript_audio_path(session_dir, meta, None)
+    return True
+
+
+def sanitize_session_audio(session_id: str, session_dir: Path, settings: dict) -> Path:
+    """Replace original audio with a noisy downsampled WAV.
+
+    This is a privacy feature. It reduces voice identifiability but is NOT a
+    formal guarantee against ML training/voice reconstruction.
+    """
+    meta = load_meta(session_dir)
+    assets = meta.get("assets") or {}
+    audio_name = assets.get("audio")
+    audio_path = resolve_asset_path(session_dir, audio_name)
+    if not audio_path or not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    target_sr = int(settings.get("audio_sanitize_resample_hz") or 8000)
+    snr_db = float(settings.get("audio_sanitize_snr_db") or 0.0)
+    target_sr = max(8000, min(48000, target_sr))
+
+    try:
+        y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read audio for sanitization: {exc}")
+    if y is None or len(y) == 0:
+        raise HTTPException(status_code=500, detail="Audio is empty")
+
+    if sr != target_sr:
+        try:
+            y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
+            sr = target_sr
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to resample audio: {exc}")
+
+    y = np.asarray(y, dtype=np.float32)
+    signal_rms = float(np.sqrt(np.mean(y**2))) if y.size else 0.0
+    if signal_rms <= 0.0:
+        signal_rms = 1e-6
+    noise_rms = signal_rms / (10.0 ** (snr_db / 20.0))
+    rng = np.random.default_rng()
+    noise = rng.standard_normal(size=y.shape).astype(np.float32)
+    noise = noise / (float(np.sqrt(np.mean(noise**2))) + 1e-9)
+    noise = noise * noise_rms
+    y2 = np.clip(y + noise, -1.0, 1.0)
+
+    out_name = "audio_sanitized.wav"
+    out_path = (session_dir / out_name).resolve()
+    try:
+        sf.write(str(out_path), y2, sr, subtype="PCM_16")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed writing sanitized audio: {exc}")
+
+    # Remove original audio file.
+    try:
+        if audio_path.resolve() != out_path:
+            audio_path.unlink()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Sanitized audio written, but failed deleting original: {exc}")
+
+    assets["audio"] = out_name
+    meta["assets"] = assets
+    save_meta(session_dir, meta)
+    update_session_paths(session_id, audio_path=_rel_to_library(out_path))
+    _update_structured_transcript_audio_path(session_dir, meta, out_path)
+    return out_path
+
+
+def maybe_postprocess_audio(session_id: str, session_dir: Path, settings: dict) -> None:
+    action = (settings.get("audio_postprocess_action") or "keep").strip().lower()
+    if action == "delete":
+        delete_session_audio(session_id, session_dir)
+    elif action == "sanitize":
+        sanitize_session_audio(session_id, session_dir, settings)
+
+
 def cosine(a, b):
     a = np.array(a)
     b = np.array(b)
@@ -533,6 +655,7 @@ def transcribe_session(session_id: str, payload: dict):
     embedding_path = maybe_embed_transcript(session_id, session_dir, transcript_path, settings)
     summary_path = maybe_summarize_transcript(session_id, session_dir, transcript_path, settings)
     maybe_suggest_title(session_id, session_dir, transcript_path, settings)
+    maybe_postprocess_audio(session_id, session_dir, settings)
     return {
         "session_id": session_id,
         "transcript_path": _rel_to_library(transcript_path),
@@ -557,6 +680,8 @@ def get_transcript(session_id: str):
     transcript_path = resolve_asset_path(session_dir, transcript_name)
     if not transcript_path or not transcript_path.exists():
         raise HTTPException(status_code=404, detail="Transcript not found")
+    audio_name = assets.get("audio")
+    audio_path = resolve_asset_path(session_dir, audio_name) if audio_name else None
     txt = transcript_path.read_text(encoding="utf-8", errors="ignore")
     struct_name = assets.get("transcript_json")
     struct_path = resolve_asset_path(session_dir, struct_name) if struct_name else transcript_path.with_suffix(".json")
@@ -569,6 +694,7 @@ def get_transcript(session_id: str):
         "participants": meta.get("participants") or [],
         "calendar": meta.get("calendar") or None,
         "assets": assets,
+        "audio_exists": bool(audio_path and audio_path.exists()),
     }
 
 
@@ -773,6 +899,27 @@ def get_audio(session_id: str, start: float = 0.0, end: float = 0.0):
     return StreamingResponse(buf, media_type="audio/wav")
 
 
+@app.post("/sessions/{session_id}/audio/delete")
+def delete_audio(session_id: str):
+    session_dir = resolve_session_dir(session_id)
+    deleted = delete_session_audio(session_id, session_dir)
+    return {"status": "ok", "deleted": deleted}
+
+
+@app.post("/sessions/{session_id}/audio/sanitize")
+def sanitize_audio(session_id: str, payload: dict):
+    session_dir = resolve_session_dir(session_id)
+    settings = load_settings()
+    if isinstance(payload, dict):
+        # Allow one-off overrides.
+        if payload.get("snr_db") is not None:
+            settings["audio_sanitize_snr_db"] = payload.get("snr_db")
+        if payload.get("resample_hz") is not None:
+            settings["audio_sanitize_resample_hz"] = payload.get("resample_hz")
+    out = sanitize_session_audio(session_id, session_dir, settings)
+    return {"status": "ok", "audio_path": _rel_to_library(out)}
+
+
 @app.post("/sessions/{session_id}/move")
 def move_session(session_id: str, payload: dict):
     folder_id = payload.get("folder_id")
@@ -942,6 +1089,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 maybe_embed_transcript(session_id, session_dir, transcript_path, settings)
                 maybe_summarize_transcript(session_id, session_dir, transcript_path, settings)
                 maybe_suggest_title(session_id, session_dir, transcript_path, settings)
+                maybe_postprocess_audio(session_id, session_dir, settings)
 
             await asyncio.to_thread(run_pipeline)
         except Exception as e:

@@ -1,7 +1,17 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { calendarSuggestions, getTranscript, linkCalendarEvent, suggestTitle, updateSpeakers, generateSummary, renameSession } from "../api";
+import {
+  calendarSuggestions,
+  deleteSessionAudio,
+  getTranscript,
+  linkCalendarEvent,
+  sanitizeSessionAudio,
+  suggestTitle,
+  updateSpeakers,
+  generateSummary,
+  renameSession
+} from "../api";
 import { useAudio } from "../hooks/useAudio";
 
 type Segment = { speaker: string; text: string; start?: number; end?: number };
@@ -58,6 +68,18 @@ export default function TranscriptPage() {
       setIsEditingTitle(false);
     },
     onError: (err: any) => alert("Failed to rename session: " + err.message)
+  });
+
+  const deleteAudioMutation = useMutation({
+    mutationFn: () => deleteSessionAudio(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["transcript", id] }),
+    onError: (err: any) => alert("Failed to delete audio: " + err.message),
+  });
+
+  const sanitizeAudioMutation = useMutation({
+    mutationFn: () => sanitizeSessionAudio(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["transcript", id] }),
+    onError: (err: any) => alert("Failed to sanitize audio: " + err.message),
   });
 
   const suggestTitleMutation = useMutation({
@@ -227,6 +249,43 @@ export default function TranscriptPage() {
 
       <div className="card" style={{ background: "#11151c", marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ marginTop: 0, marginBottom: 0 }}>Privacy</h3>
+          {data.audio_exists ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn secondary"
+                onClick={() => sanitizeAudioMutation.mutate()}
+                disabled={sanitizeAudioMutation.isPending || deleteAudioMutation.isPending}
+              >
+                {sanitizeAudioMutation.isPending ? "Sanitizing..." : "Sanitize Audio"}
+              </button>
+              <button
+                className="btn danger"
+                onClick={() => {
+                  if (!confirm("Delete the original audio file? This cannot be undone.")) return;
+                  deleteAudioMutation.mutate();
+                }}
+                disabled={sanitizeAudioMutation.isPending || deleteAudioMutation.isPending}
+              >
+                {deleteAudioMutation.isPending ? "Deleting..." : "Delete Audio"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {data.audio_exists ? (
+          <p style={{ marginTop: 10, color: "#94a3b8" }}>
+            Audio is stored on disk. For maximum privacy, delete it after transcription. Sanitizing reduces voice fidelity but is not a formal guarantee
+            against ML training/voice reconstruction.
+          </p>
+        ) : (
+          <p style={{ marginTop: 10, color: "#94a3b8" }}>
+            Audio is not available for this session (deleted or not stored). Playback is disabled.
+          </p>
+        )}
+      </div>
+
+      <div className="card" style={{ background: "#11151c", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ marginTop: 0, marginBottom: 0 }}>Calendar</h3>
           <button className="btn secondary" onClick={() => calendarMutation.mutate()} disabled={calendarMutation.isPending}>
             {calendarMutation.isPending ? "Loading..." : "Suggest Event"}
@@ -335,7 +394,7 @@ export default function TranscriptPage() {
               )}
             </div>
             <div style={{ margin: "4px 0" }}>{s.text}</div>
-            <button className="btn secondary" onClick={() => play(audioSrc(s.start, s.end), speed)}>
+            <button className="btn secondary" onClick={() => play(audioSrc(s.start, s.end), speed)} disabled={!data.audio_exists}>
               Play
             </button>
           </div>

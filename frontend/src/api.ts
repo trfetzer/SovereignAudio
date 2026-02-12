@@ -34,7 +34,7 @@ export const listSessions = (folderId?: number | null) => {
 };
 export const getSession = (sessionId: string) => request<any>(`/sessions/${encodeURIComponent(sessionId)}`);
 export const getTranscript = (sessionId: string) =>
-  request<{ session_id: string; text: string; structured?: string; title?: string; participants?: any[]; calendar?: any; assets?: any }>(
+  request<{ session_id: string; text: string; structured?: string; title?: string; participants?: any[]; calendar?: any; assets?: any; audio_exists?: boolean }>(
     `/sessions/${encodeURIComponent(sessionId)}/transcript`
   );
 export const renameSession = (sessionId: string, title: string) =>
@@ -71,3 +71,12 @@ export const linkCalendarEvent = (sessionId: string, event: any, applyParticipan
   request(`/sessions/${encodeURIComponent(sessionId)}/calendar_link`, { method: "POST", body: JSON.stringify({ event, apply_participants: applyParticipants }) });
 export const suggestTitle = (sessionId: string) =>
   request<{ titles: string[] }>(`/sessions/${encodeURIComponent(sessionId)}/suggest_title`, { method: "POST" });
+
+export const deleteSessionAudio = (sessionId: string) =>
+  request<{ status: string; deleted: boolean }>(`/sessions/${encodeURIComponent(sessionId)}/audio/delete`, { method: "POST" });
+
+export const sanitizeSessionAudio = (sessionId: string, payload: { snr_db?: number; resample_hz?: number } = {}) =>
+  request<{ status: string; audio_path: string }>(`/sessions/${encodeURIComponent(sessionId)}/audio/sanitize`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });

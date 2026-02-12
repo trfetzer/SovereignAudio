@@ -121,6 +121,50 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="card" style={{ marginTop: 16, background: "#11151c" }}>
+        <h3 style={{ marginTop: 0 }}>Privacy</h3>
+        <div className="row">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <label>Audio after processing</label>
+            <select
+              className="select"
+              value={current?.audio_postprocess_action || "keep"}
+              onChange={(e) => update("audio_postprocess_action", e.target.value)}
+            >
+              <option value="keep">Keep original audio</option>
+              <option value="delete">Delete original audio</option>
+              <option value="sanitize">Replace with noisy audio (sanitize)</option>
+            </select>
+            <div className="hint" style={{ marginTop: 6 }}>
+              Deleting is the only reliable way to prevent reuse; sanitizing reduces voice fidelity but is not a formal guarantee.
+            </div>
+          </div>
+        </div>
+        {String(current?.audio_postprocess_action || "keep") === "sanitize" && (
+          <div className="row" style={{ marginTop: 12 }}>
+            <div style={{ width: 220 }}>
+              <label>Sanitize SNR (dB)</label>
+              <input
+                className="input"
+                type="number"
+                step="0.5"
+                value={current?.audio_sanitize_snr_db ?? 0}
+                onChange={(e) => update("audio_sanitize_snr_db", parseFloat(e.target.value || "0"))}
+              />
+            </div>
+            <div style={{ width: 220 }}>
+              <label>Resample (Hz)</label>
+              <input
+                className="input"
+                type="number"
+                value={current?.audio_sanitize_resample_hz ?? 8000}
+                onChange={(e) => update("audio_sanitize_resample_hz", parseInt(e.target.value || "8000", 10))}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <button className="btn" style={{ marginTop: 18 }} onClick={() => mutation.mutate(current || {})}>
         Save
       </button>
