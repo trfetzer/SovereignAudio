@@ -59,7 +59,6 @@ from library_store import (
     save_meta,
     trash_root,
 )
-from voiceprints import load_voiceprints, save_voiceprints
 from vector_store import search_similar
 
 SETTINGS_FILE = os.path.join(LIBRARY_ROOT, "settings.json")
@@ -704,16 +703,6 @@ def update_speakers(session_id: str, payload: dict):
         struct_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         lines = [f"[{seg.get('speaker', 'Unknown')}] {seg.get('text', '')}" for seg in data.get("segments", [])]
         transcript_path.write_text("\n".join(lines), encoding="utf-8")
-
-        vps = load_voiceprints()
-        vp_changed = False
-        for old_name, new_name in updates.items():
-            for _, info in vps.items():
-                if info.get("name") == old_name:
-                    info["name"] = new_name
-                    vp_changed = True
-        if vp_changed:
-            save_voiceprints(vps)
 
     return {"status": "ok"}
 

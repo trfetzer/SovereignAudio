@@ -55,7 +55,7 @@ This folder is a clean copy of the app with no audio, transcripts, or embeddings
   - `library/Folders/<folder>/…` — sessions you drag/drop into folders.
   - `library/Trash/…` — deleted sessions/folders (non-destructive).
   - `library/file_index.db`, `library/vector_index.db` — indexes (rebuildable).
-  - `library/voiceprints.json`, `library/settings.json`, `library/vocab.json`.
+  - `library/settings.json`, `library/vocab.json`.
 - You can override the location with `SOV_AUDIO_LIBRARY_ROOT=/path/to/Library`.
 - To delete all local data:
   - macOS/Linux: `rm -rf library`
@@ -64,5 +64,6 @@ This folder is a clean copy of the app with no audio, transcripts, or embeddings
 
 ## Notes
 - Configure embedding/summary behavior in `settings.json` or via the Settings page (auto-embed/auto-summarize).
+- Speaker clustering happens per conversation; no persistent speaker profiles/voiceprints are written to disk.
 - Calendar integration uses a read-only ICS feed URL (Settings → Calendar).
 - If exposing the app beyond your machine, put it behind HTTPS and add auth. For local use, keep it on LAN or localhost.

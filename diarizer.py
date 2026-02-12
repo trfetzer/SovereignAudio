@@ -15,7 +15,6 @@ from config import (
     ASR_COMPUTE_TYPE,
     DEFAULT_LANGUAGE,
 )
-from voiceprints import load_voiceprints, save_voiceprints
 
 
 NLTK_DATA_DIR = Path(__file__).resolve().parent / "nltk_data"
@@ -141,29 +140,9 @@ def transcribe_with_diarization(
             seg["speaker"] = f"Speaker_{len(clusters)}"
             clusters.append({"centroid": emb, "segments": [i]})
 
-    vps = load_voiceprints()
+    # IMPORTANT: Speaker "voiceprints" are used only in-memory for clustering within this
+    # conversation. We do NOT persist speaker embeddings or profiles across sessions.
     name_map = {}
-
-    if prompt_name_mapping:
-        unique_speakers = {seg["speaker"] for seg in segments}
-        for spk in unique_speakers:
-            rep = next((s for s in segments if s.get("speaker") == spk and s.get("embedding") is not None), None)
-            if rep:
-                emb = rep["embedding"]
-                match = next(
-                    (
-                        info["name"]
-                        for info in vps.values()
-                        if np.dot(emb, np.array(info["embedding"]))
-                        / (np.linalg.norm(emb) * np.linalg.norm(info["embedding"]))
-                        > 0.85
-                    ),
-                    None,
-                )
-                if match:
-                    name_map[spk] = match
-
-    save_voiceprints(vps)
 
     base_name = os.path.splitext(os.path.basename(audio_path))[0] + "_diarized"
     out_dir = output_dir or TRANSCRIPT_FOLDER
